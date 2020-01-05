@@ -1,0 +1,10 @@
+---
+# vars file for ACMEcPanel
+cPanel_endpoint_complete: "https://{{ cPanel_endpoint }}:2083/execute/"
+ACMEcPanel_account_key_path: "{{ ACMEcPanel_storage_path }}/{{ ACMEcPanel_account_key_file }}"
+ACMEcPanel_certificate_key_path: "{{ ACMEcPanel_storage_path }}/{{ ACMEcPanel_certificate_key_file }}"
+ACMEcPanel_certificate_request_path: "{{ ACMEcPanel_storage_path }}/{{ ACMEcPanel_certificate_request_file }}"
+ACMEcPanel_certificate_path: "{{ ACMEcPanel_storage_path }}/{{ ACMEcPanel_certificate_file }}"
+ACMEcPanel_certificate_chain_path: "{{ ACMEcPanel_storage_path }}/{{ ACMEcPanel_certificate_chain_file }}"
+ACMEcPanel_challenge_path: "public_html/.well-known/acme-challenge"
+

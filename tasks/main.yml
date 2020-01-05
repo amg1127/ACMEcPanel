@@ -1,0 +1,88 @@
+---
+# tasks file for ACMEcPanel
+- name: Create permanent storage space
+  file:
+    path: "{{ ACMEcPanel_storage_path }}"
+    state: directory
+- name: Generate ACME account key
+  openssl_privatekey:
+    backup: yes
+    path: "{{ ACMEcPanel_account_key_path }}"
+    state: present
+- name: Generate certificate private key
+  openssl_privatekey:
+    path: "{{ ACMEcPanel_certificate_key_path }}"
+    state: present
+- name: Generate certificate request
+  openssl_csr:
+    path: "{{ ACMEcPanel_certificate_request_path }}"
+    privatekey_path: "{{ ACMEcPanel_certificate_key_path }}"
+    subject_alt_name: "{{ cPanel_websites | map('regex_replace', '^', 'DNS:') | join(',') }}"
+    state: present
+- name: Generate ACME domain ownership challenges
+  acme_certificate:
+    account_email: "{{ acme_account_email | default(omit) }}"
+    account_key_src: "{{ ACMEcPanel_account_key_path }}"
+    acme_directory: "{{ acme_directory | default(omit) }}"
+    acme_version: "{{ acme_version | default(omit) }}"
+    agreement: "{{ acme_agreement | default(omit) }}"
+    chain_dest: "{{ ACMEcPanel_certificate_chain_path }}"
+    challenge: 'http-01'
+    csr: "{{ ACMEcPanel_certificate_request_path }}"
+    dest: "{{ ACMEcPanel_certificate_path }}"
+    modify_account: yes
+    remaining_days: 30
+    terms_agreed: "{{ acme_terms_agreed | default(omit) }}"
+  register: ACMEcPanel_ACME_challenge
+- name: Upload ACME domain ownership challenge resources to website root
+  include_tasks: 'upload_files.yml'
+  with_dict:
+  - "{{ ACMEcPanel_ACME_challenge['challenge_data'] }}"
+  when:
+  - ACMEcPanel_ACME_challenge is changed
+- name: Let the challenge be validated and retrieve the certificate
+  acme_certificate:
+    account_key_src: "{{ ACMEcPanel_account_key_path }}"
+    acme_directory: "{{ acme_directory | default(omit) }}"
+    acme_version: "{{ acme_version | default(omit) }}"
+    chain_dest: "{{ ACMEcPanel_certificate_chain_path }}"
+    csr: "{{ ACMEcPanel_certificate_request_path }}"
+    data: "{{ ACMEcPanel_ACME_challenge }}"
+    dest: "{{ ACMEcPanel_certificate_path }}"
+  when:
+  - ACMEcPanel_ACME_challenge is changed
+- name: Retrieve certificate private key
+  slurp:
+    src: "{{ ACMEcPanel_certificate_key_path }}"
+  register: ACMEcPanel_certificate_key_var
+- name: Retrieve certificate file
+  slurp:
+    src: "{{ ACMEcPanel_certificate_path }}"
+  register: ACMEcPanel_certificate_var
+- name: Retrieve certificate chain
+  slurp:
+    src: "{{ ACMEcPanel_certificate_chain_path }}"
+  register: ACMEcPanel_certificate_chain_var
+- name: Upload ACME certificate using UAPI
+  uri:
+    body:
+      domain: "{{ cPanel_websites[0] }}"
+      cert: "{{ ACMEcPanel_certificate_var['content'] | b64decode }}"
+      key: "{{ ACMEcPanel_certificate_key_var['content'] | b64decode }}"
+      cabundle: "{{ ACMEcPanel_certificate_chain_var['content'] | b64decode }}\n{{ lookup('file', 'isrgrootx1.pem') }}\n{{ lookup('file', 'fakelerootx1.pem') }}"
+    body_format: form-urlencoded
+    force_basic_auth: yes
+    method: POST
+    return_content: yes
+    url: "{{ cPanel_endpoint_complete }}/SSL/install_ssl"
+    url_username: "{{ cPanel_user | default(omit) }}"
+    url_password: "{{ cPanel_password | default(omit) }}"
+  register: ACMEcPanel_certificate_install
+- name: Ensure that ACME certificate has been uploaded and installed successfully
+  assert:
+    that:
+    - ACMEcPanel_certificate_install['json']['status'] == 1
+    - ACMEcPanel_certificate_install['json']['errors'] is none
+    success_msg: "{{ (ACMEcPanel_certificate_install['json']['messages'] | default([''], true)) | join('\n') }}"
+    fail_msg: "Errors occurred while uploading ACME certificate into cPanel: {{ (ACMEcPanel_certificate_install['json']['errors'] | default([''], true)) | join('\n') }}"
+

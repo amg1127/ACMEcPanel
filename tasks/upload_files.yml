@@ -1,0 +1,88 @@
+---
+- name: Ensure that ACME challenge resource name does not contain characters which could cause problems
+  fail:
+    msg: "Invalid ACME challenge resource name: {{ item.value['http-01']['resource'] }}"
+  when:
+  - item.value['http-01']['resource'] is search("(\"|'|\.\.)")
+- name: Upload ACME domain ownership challenge resource
+  block:
+  - name: Upload ACME domain ownership challenge resource using UAPI
+    # This block is actually untested. It throws the error "The cURL call returned valid JSON, but reported errors: You must specify at least one file to upload."
+    #    when running against the cPanel server hosting my website. I hope it works...
+    # This code is here because Ansible 2.9 does not support file upload in URI module: https://github.com/ansible/ansible/issues/38172
+    # Meanwhile, I will be uploading files via SFTP...
+    uri:
+      body_format: 'raw'
+      body: "{{ ACMEcPanel_request_body }}"
+      force_basic_auth: yes
+      headers:
+        Content-Type: 'multipart/form-data; boundary={{ ACMEcPanel_form_data_boundary }}'
+      method: POST
+      return_content: yes
+      url: "{{ cPanel_endpoint_complete }}/Fileman/upload_files"
+      url_username: "{{ cPanel_user | default(omit) }}"
+      url_password: "{{ cPanel_password | default(omit) }}"
+    register: ACMEcPanel_ACME_challenge_resource_creation
+    vars:
+      ACMEcPanel_form_data_boundary: "-------------{{ 100000 | random | hash('sha1') }}"
+      ACMEcPanel_request_body: |
+        --{{ ACMEcPanel_form_data_boundary }}
+        Content-Disposition: form-data; name="file-1"; filename="{{ item.value['http-01']['resource'] | basename }}"
+        Content-Type: text/plain; charset="utf-8"
+
+        {{ item.value['http-01']['resource_value'] }}
+        --{{ ACMEcPanel_form_data_boundary }}
+        Content-Disposition: form-data; name="dir"
+        
+        {{ ACMEcPanel_challenge_path }}
+        --{{ ACMEcPanel_form_data_boundary }}--
+  - name: Ensure that ACME domain ownership challenge resource has been created
+    assert:
+      that:
+      - ACMEcPanel_ACME_challenge_resource_creation['json']['status'] == 1
+      - ACMEcPanel_ACME_challenge_resource_creation['json']['errors'] is none
+      success_msg: "{{ (ACMEcPanel_ACME_challenge_resource_creation['json']['messages'] | default([''], true)) | join('\n') }}"
+      fail_msg: "Errors occurred while uploading '{{ item.value['http-01']['resource'] }}: {{ (ACMEcPanel_ACME_challenge_resource_creation['json']['errors'] | default([''], true)) | join('\n') }}"
+  rescue:
+  - name: Create a temporary ACME resource file
+    tempfile:
+      state: file
+    register: ACMEcPanel_ACME_challenge_localfile
+  - name: Store ACME challenge resource data into temporary file
+    copy:
+      content: "{{ item.value['http-01']['resource_value'] }}"
+      dest: "{{ ACMEcPanel_ACME_challenge_localfile['path'] }}"
+      force: yes
+  - name: Create a temporary SFTP response list
+    set_fact:
+      ACMEcPanel_SFTP_response_list: []
+  - name: Build SFTP responses (directory creation)
+    set_fact:
+      ACMEcPanel_SFTP_response_list: "{{ ACMEcPanel_SFTP_response_list | union([(\"mkdir '\" + path_component + \"'\"), (\"chdir '\" + path_component + \"'\")]) }}"
+    with_items:
+    - "{{ ('public_html/' + (item.value['http-01']['resource'] | dirname)).split('/') | reject('match', '^$') | list }}"
+    loop_control:
+      loop_var: path_component
+  - name: Build SFTP responses (file upload)
+    set_fact:
+      ACMEcPanel_SFTP_response_list: "{{ ACMEcPanel_SFTP_response_list | union([snippet]) }}"
+    with_items:
+    - "put '{{ ACMEcPanel_ACME_challenge_localfile['path'] }}' '{{ item.value['http-01']['resource'] | basename }}'"
+    - "chmod 644 '{{ item.value['http-01']['resource'] | basename }}'"
+    - "bye"
+    loop_control:
+      loop_var: snippet
+  - name: Upload ACME domain ownership challenge resource using Secure FTP
+    expect:
+      command: "/usr/bin/sftp -o 'ChallengeResponseAuthentication=no' -o 'GSSAPIAuthentication=no' -o 'PubkeyAuthentication=no' -o 'PasswordAuthentication=yes' -o 'KbdInteractiveAuthentication=yes' '{{ cPanel_user | default(ansible_facts['user_id']) }}@{{ cPanel_endpoint }}'"
+      echo: no
+      responses:
+        (?i).*password.*: "{{ cPanel_password | default(omit) }}"
+        (?i)sftp.*>: "{{ ACMEcPanel_SFTP_response_list }}"
+      timeout: 120
+    no_log: yes
+  - name: Remove temporary ACME resource file
+    file:
+      path: "{{ ACMEcPanel_ACME_challenge_localfile['path'] }}"
+      state: absent
+

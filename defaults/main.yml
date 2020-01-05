@@ -1,0 +1,9 @@
+---
+# defaults file for ACMEcPanel
+ACMEcPanel_storage_path: "{{ lookup('env','XDG_DATA_HOME') | default(lookup('env','HOME') + '/.local/share', true) }}/ACMEcPanel"
+ACMEcPanel_account_key_file: 'ACME.key'
+ACMEcPanel_certificate_key_file: 'certificate.key'
+ACMEcPanel_certificate_request_file: 'certificate.csr'
+ACMEcPanel_certificate_file: 'certificate.crt'
+ACMEcPanel_certificate_chain_file: 'chain.crt'
+
