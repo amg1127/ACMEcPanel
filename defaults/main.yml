@@ -6,4 +6,5 @@ ACMEcPanel_certificate_key_file: 'certificate.key'
 ACMEcPanel_certificate_request_file: 'certificate.csr'
 ACMEcPanel_certificate_file: 'certificate.crt'
 ACMEcPanel_certificate_chain_file: 'chain.crt'
+ACMEcPanel_remaining_days: 30
 

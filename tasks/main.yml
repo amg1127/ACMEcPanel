@@ -31,7 +31,7 @@
     csr: "{{ ACMEcPanel_certificate_request_path }}"
     dest: "{{ ACMEcPanel_certificate_path }}"
     modify_account: yes
-    remaining_days: 30
+    remaining_days: "{{ ACMEcPanel_remaining_days }}"
     terms_agreed: "{{ acme_terms_agreed | default(omit) }}"
   register: ACMEcPanel_ACME_challenge
 - name: Upload ACME domain ownership challenge resources to website root
@@ -42,13 +42,16 @@
   - ACMEcPanel_ACME_challenge is changed
 - name: Let the challenge be validated and retrieve the certificate
   acme_certificate:
+    account_email: "{{ acme_account_email | default(omit) }}"
     account_key_src: "{{ ACMEcPanel_account_key_path }}"
     acme_directory: "{{ acme_directory | default(omit) }}"
     acme_version: "{{ acme_version | default(omit) }}"
     chain_dest: "{{ ACMEcPanel_certificate_chain_path }}"
+    challenge: 'http-01'
     csr: "{{ ACMEcPanel_certificate_request_path }}"
-    data: "{{ ACMEcPanel_ACME_challenge }}"
     dest: "{{ ACMEcPanel_certificate_path }}"
+    remaining_days: "{{ ACMEcPanel_remaining_days }}"
+    data: "{{ ACMEcPanel_ACME_challenge }}"
   when:
   - ACMEcPanel_ACME_challenge is changed
 - name: Retrieve certificate private key
