@@ -33,16 +33,18 @@
         {{ item.value['http-01']['resource_value'] }}
         --{{ ACMEcPanel_form_data_boundary }}
         Content-Disposition: form-data; name="dir"
-        
+
         {{ ACMEcPanel_challenge_path }}
         --{{ ACMEcPanel_form_data_boundary }}--
   - name: Ensure that ACME domain ownership challenge resource has been created
+    vars:
+      ACMEcPanel_ACME_challenge_resource_creation_json: "{{ ACMEcPanel_ACME_challenge_resource_creation['content'] | from_json }}"
     assert:
       that:
-      - ACMEcPanel_ACME_challenge_resource_creation['json']['status'] == 1
-      - ACMEcPanel_ACME_challenge_resource_creation['json']['errors'] is none
-      success_msg: "{{ (ACMEcPanel_ACME_challenge_resource_creation['json']['messages'] | default([''], true)) | join('\n') }}"
-      fail_msg: "Errors occurred while uploading '{{ item.value['http-01']['resource'] }}: {{ (ACMEcPanel_ACME_challenge_resource_creation['json']['errors'] | default([''], true)) | join('\n') }}"
+      - ACMEcPanel_ACME_challenge_resource_creation_json['status'] == 1
+      - ACMEcPanel_ACME_challenge_resource_creation_json['errors'] is none
+      success_msg: "{{ (ACMEcPanel_ACME_challenge_resource_creation_json['messages'] | default([''], true)) | join('\n') }}"
+      fail_msg: "Errors occurred while uploading '{{ item.value['http-01']['resource'] }}: {{ (ACMEcPanel_ACME_challenge_resource_creation_json['errors'] | default([''], true)) | join('\n') }}"
   rescue:
   - name: Create a temporary ACME resource file
     tempfile:

@@ -82,10 +82,12 @@
     url_password: "{{ cPanel_password | default(omit) }}"
   register: ACMEcPanel_certificate_install
 - name: Ensure that ACME certificate has been uploaded and installed successfully
+  vars:
+    ACMEcPanel_certificate_install_json: "{{ ACMEcPanel_certificate_install['content'] | from_json }}"
   assert:
     that:
-    - ACMEcPanel_certificate_install['json']['status'] == 1
-    - ACMEcPanel_certificate_install['json']['errors'] is none
-    success_msg: "{{ (ACMEcPanel_certificate_install['json']['messages'] | default([''], true)) | join('\n') }}"
-    fail_msg: "Errors occurred while uploading ACME certificate into cPanel: {{ (ACMEcPanel_certificate_install['json']['errors'] | default([''], true)) | join('\n') }}"
+    - ACMEcPanel_certificate_install_json['status'] == 1
+    - ACMEcPanel_certificate_install_json['errors'] is none
+    success_msg: "{{ (ACMEcPanel_certificate_install_json['messages'] | default([''], true)) | join('\n') }}"
+    fail_msg: "Errors occurred while uploading ACME certificate into cPanel: {{ (ACMEcPanel_certificate_install_json['errors'] | default([''], true)) | join('\n') }}"
 
