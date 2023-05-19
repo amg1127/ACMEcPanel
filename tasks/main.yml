@@ -52,6 +52,10 @@
     dest: "{{ ACMEcPanel_certificate_path }}"
     remaining_days: "{{ ACMEcPanel_remaining_days }}"
     data: "{{ ACMEcPanel_ACME_challenge }}"
+  register: ACMEcPanel_ACME_challenge_response
+  retries: 5
+  delay: 1
+  until: 'ACMEcPanel_ACME_challenge_response is success'
   when:
   - ACMEcPanel_ACME_challenge is changed
 - name: Retrieve certificate private key

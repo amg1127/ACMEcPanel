@@ -87,4 +87,18 @@
     file:
       path: "{{ ACMEcPanel_ACME_challenge_localfile['path'] }}"
       state: absent
-
+  - name: Ensure that the ACME resource file has been uploaded successfully
+    uri:
+      url: "http://{{ cPanel_websites[0] }}/{{ item.value['http-01']['resource'] }}"
+      follow_redirects: no
+      force: true
+      return_content: yes
+    register: ACMEcPanel_ACME_challenge_downloadTest
+    retries: 5
+    delay: 1
+    until: 'ACMEcPanel_ACME_challenge_downloadTest is success'
+  - name: Ensure that the ACME resource file content matches the content that was previously uploaded
+    assert:
+      that: "ACMEcPanel_ACME_challenge_downloadTest.content == item.value['http-01']['resource_value']"
+      success_msg: "ACME resource file '{{ item.value['http-01']['resource'] }}' on remote server stores the expected content."
+      fail_msg: "! ACME resource file '{{ item.value['http-01']['resource'] }}' on remote server does NOT store the expected content!!!"
