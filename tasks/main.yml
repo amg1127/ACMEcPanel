@@ -9,10 +9,12 @@
     backup: yes
     path: "{{ ACMEcPanel_account_key_path }}"
     state: present
+  no_log: yes
 - name: Generate certificate private key
   openssl_privatekey:
     path: "{{ ACMEcPanel_certificate_key_path }}"
     state: present
+  no_log: yes
 - name: Generate certificate request
   openssl_csr:
     path: "{{ ACMEcPanel_certificate_request_path }}"
@@ -62,6 +64,7 @@
   slurp:
     src: "{{ ACMEcPanel_certificate_key_path }}"
   register: ACMEcPanel_certificate_key_var
+  no_log: yes
 - name: Retrieve certificate file
   slurp:
     src: "{{ ACMEcPanel_certificate_path }}"
