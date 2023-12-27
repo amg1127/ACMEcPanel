@@ -60,14 +60,14 @@
       ACMEcPanel_SFTP_response_list: []
   - name: Build SFTP responses (directory creation)
     set_fact:
-      ACMEcPanel_SFTP_response_list: "{{ ACMEcPanel_SFTP_response_list | union([(\"mkdir '\" + path_component + \"'\"), (\"chdir '\" + path_component + \"'\")]) }}"
+      ACMEcPanel_SFTP_response_list: "{{ ACMEcPanel_SFTP_response_list + [(\"mkdir '\" + path_component + \"'\"), (\"chdir '\" + path_component + \"'\")] }}"
     with_items:
     - "{{ ('public_html/' + (item.value['http-01']['resource'] | dirname)).split('/') | reject('match', '^$') | list }}"
     loop_control:
       loop_var: path_component
   - name: Build SFTP responses (file upload)
     set_fact:
-      ACMEcPanel_SFTP_response_list: "{{ ACMEcPanel_SFTP_response_list | union([snippet]) }}"
+      ACMEcPanel_SFTP_response_list: "{{ ACMEcPanel_SFTP_response_list + [snippet] }}"
     with_items:
     - "put '{{ ACMEcPanel_ACME_challenge_localfile['path'] }}' '{{ item.value['http-01']['resource'] | basename }}'"
     - "chmod 644 '{{ item.value['http-01']['resource'] | basename }}'"
